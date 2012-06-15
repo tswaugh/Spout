@@ -1,38 +1,14 @@
-/*
- * This file is part of Spout.
- *
- * Copyright (c) 2011-2012, SpoutDev <http://www.spout.org/>
- * Spout is licensed under the SpoutDev License Version 1.
- *
- * Spout is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Lesser General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * In addition, 180 days after any changes are published, you can use the
- * software, incorporating those changes, under the terms of the MIT license,
- * as described in the SpoutDev License Version 1.
- *
- * Spout is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Lesser General Public License for more details.
- *
- * You should have received a copy of the GNU Lesser General Public License,
- * the MIT license and the SpoutDev License Version 1 along with this program.
- * If not, see <http://www.gnu.org/licenses/> for the GNU Lesser General Public
- * License and see <http://www.spout.org/SpoutDevLicenseV1.txt> for the full license,
- * including the MIT license.
- */
 package org.spout.engine.player;
 
 import java.net.InetAddress;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.spout.api.Spout;
 import org.spout.api.data.ValueHolder;
 import org.spout.api.entity.Entity;
+import org.spout.api.entity.component.Controller;
 import org.spout.api.event.Result;
 import org.spout.api.event.player.PlayerChatEvent;
 import org.spout.api.event.server.data.RetrieveDataEvent;
@@ -40,25 +16,28 @@ import org.spout.api.event.server.permissions.PermissionGetGroupsEvent;
 import org.spout.api.event.server.permissions.PermissionGroupEvent;
 import org.spout.api.event.server.permissions.PermissionNodeEvent;
 import org.spout.api.geo.World;
+import org.spout.api.geo.cuboid.Chunk;
+import org.spout.api.geo.discrete.Transform;
 import org.spout.api.player.Player;
+import org.spout.api.player.PlayerController;
 import org.spout.api.player.PlayerInputState;
 import org.spout.api.protocol.Message;
 import org.spout.api.protocol.NetworkSynchronizer;
+import org.spout.api.protocol.Session;
 import org.spout.api.util.thread.DelayedWrite;
 import org.spout.api.util.thread.SnapshotRead;
 import org.spout.api.util.thread.Threadsafe;
-
+import org.spout.engine.SpoutConfiguration;
+import org.spout.engine.SpoutEngine;
 import org.spout.engine.entity.SpoutEntity;
 import org.spout.engine.protocol.SpoutSession;
 import org.spout.engine.util.TextWrapper;
 
-public class SpoutPlayer implements Player {
+public class SpoutPlayer extends SpoutEntity implements Player {
 	private final AtomicReference<SpoutSession> sessionLive = new AtomicReference<SpoutSession>();
 	private SpoutSession session;
 	private final String name;
 	private final AtomicReference<String> displayName = new AtomicReference<String>();
-	private final AtomicReference<SpoutEntity> entityLive = new AtomicReference<SpoutEntity>();
-	private Entity entity;
 	private final AtomicReference<NetworkSynchronizer> synchronizerLive = new AtomicReference<NetworkSynchronizer>();
 	private NetworkSynchronizer synchronizer;
 	private final AtomicBoolean onlineLive = new AtomicBoolean(false);
@@ -66,20 +45,20 @@ public class SpoutPlayer implements Player {
 	private final int hashcode;
 	private final PlayerInputState inputState = new PlayerInputState();
 
-	public SpoutPlayer(String name) {
+	public SpoutPlayer(String name, SpoutSession session, SpoutEngine engine, Transform transform, Controller controller) {
+		super(engine, transform, controller, SpoutConfiguration.VIEW_DISTANCE.getInt() * Chunk.BLOCKS.SIZE);
+		sessionLive.set(session);
+		this.session = session;
+		online = true;
+		onlineLive.set(true);
 		this.name = name;
 		displayName.set(name);
 		hashcode = name.hashCode();
 	}
 
-	public SpoutPlayer(String name, SpoutEntity entity, SpoutSession session) {
-		this(name);
-		sessionLive.set(session);
-		this.session = session;
-		entityLive.set(entity);
-		this.entity = entity;
-		online = true;
-		onlineLive.set(true);
+	@Override
+	public PlayerController getController() {
+		return (PlayerController) super.getController();
 	}
 
 	@Override
@@ -98,12 +77,6 @@ public class SpoutPlayer implements Player {
 	@Threadsafe
 	public void setDisplayName(String name) {
 		displayName.set(name);
-	}
-
-	@Override
-	@SnapshotRead
-	public Entity getEntity() {
-		return entity;
 	}
 
 	@Override
@@ -138,24 +111,20 @@ public class SpoutPlayer implements Player {
 			return false;
 		}
 
-		final SpoutEntity entity = entityLive.getAndSet(null);
-		if (entity != null) {
-			entity.kill();
-		}
 		sessionLive.set(null);
 		synchronizerLive.set(null);
 		return true;
 	}
 
 	@DelayedWrite
-	public boolean connect(SpoutSession session, SpoutEntity entity) {
+	public boolean connect(SpoutSession session, Player newEntity) {
 		if (!onlineLive.compareAndSet(false, true)) {
 			// player was already online
 			return false;
 		}
 
 		sessionLive.set(session);
-		entityLive.set(entity);
+
 		copyToSnapshot();
 		return true;
 	}
@@ -165,7 +134,7 @@ public class SpoutPlayer implements Player {
 		if (message.startsWith("/")) {
 			Spout.getEngine().processCommand(this, message.substring(1));
 		} else {
-			PlayerChatEvent event = Spout.getEngine().getEventManager().callEvent(new PlayerChatEvent(this, message));
+			PlayerChatEvent event = Spout.getEngine().getEventManager().callEvent(new PlayerChatEvent(this.getController(), message));
 			if (event.isCancelled()) {
 				return;
 			}
@@ -179,18 +148,14 @@ public class SpoutPlayer implements Player {
 		}
 	}
 
-	@Override
 	public boolean sendMessage(String message) {
 		boolean success = false;
-		if (getEntity() != null) {
-			for (String line : TextWrapper.wrapText(message)) {
-				success |= sendRawMessage(line);
-			}
+		for (String line : TextWrapper.wrapText(message)) {
+			success |= sendRawMessage(line);
 		}
 		return success;
 	}
 
-	@Override
 	public boolean sendRawMessage(String message) {
 		Message chatMessage = getSession().getPlayerProtocol().getChatMessage(message);
 		if (message == null) {
@@ -224,19 +189,12 @@ public class SpoutPlayer implements Player {
 	public void copyToSnapshot() {
 		session = sessionLive.get();
 		online = onlineLive.get();
-		entity = entityLive.get();
 		synchronizer = synchronizerLive.get();
 	}
 
 	@Override
 	public boolean hasPermission(String node) {
-		World world = null;
-		Entity entity = getEntity();
-		if (entity != null) {
-			world = entity.getWorld();
-		}
-
-		return hasPermission(world, node);
+		return hasPermission(getWorld(), node);
 	}
 
 	@Override
@@ -251,25 +209,13 @@ public class SpoutPlayer implements Player {
 
 	@Override
 	public boolean isInGroup(String group) {
-		World world = null;
-		Entity entity = getEntity();
-		if (entity != null) {
-			world = entity.getWorld();
-		}
-
-		PermissionGroupEvent event = Spout.getEngine().getEventManager().callEvent(new PermissionGroupEvent(world, this, group));
+		PermissionGroupEvent event = Spout.getEngine().getEventManager().callEvent(new PermissionGroupEvent(getWorld(), this, group));
 		return event.getResult();
 	}
 
 	@Override
 	public String[] getGroups() {
-		World world = null;
-		Entity entity = getEntity();
-		if (entity != null) {
-			world = entity.getWorld();
-		}
-
-		PermissionGetGroupsEvent event = Spout.getEngine().getEventManager().callEvent(new PermissionGetGroupsEvent(world, this));
+		PermissionGetGroupsEvent event = Spout.getEngine().getEventManager().callEvent(new PermissionGetGroupsEvent(getWorld(), this));
 		return event.getGroups();
 	}
 
@@ -321,4 +267,7 @@ public class SpoutPlayer implements Player {
 		return inputState;
 	}
 
+	@Override
+	public void onTick(float dt) {
+	}
 }

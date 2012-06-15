@@ -197,7 +197,7 @@ public final class SpoutSession implements Session {
 			MessageHandler<Message> handler = (MessageHandler<Message>) protocol.get().getHandlerLookupService().find(message.getClass());
 			if (handler != null) {
 				try {
-					handler.handle(this, player, message);
+					handler.handle(this, player.getController(), message);
 				} catch (Exception e) {
 					Spout.getEngine().getLogger().log(Level.SEVERE, "Message handler for " + message.getClass().getSimpleName() + " threw exception for player " + (getPlayer() != null ? getPlayer().getName() : "null"));
 					e.printStackTrace();
@@ -258,14 +258,14 @@ public final class SpoutSession implements Session {
 		if (player != null) {
 			PlayerLeaveEvent event;
 			if (kick) {
-				event = getGame().getEventManager().callEvent(new PlayerKickEvent(player, getDefaultLeaveMessage(), reason));
+				event = getGame().getEventManager().callEvent(new PlayerKickEvent(player.getController(), getDefaultLeaveMessage(), reason));
 				if (event.isCancelled()) {
 					return false;
 				}
 
 				getGame().getLogger().log(Level.INFO, "Player {0} kicked: {1}", new Object[]{player.getName(), reason});
 			} else {
-				event = new PlayerLeaveEvent(player, getDefaultLeaveMessage());
+				event = new PlayerLeaveEvent(player.getController(), getDefaultLeaveMessage());
 			}
 			dispose(event);
 		}
@@ -312,7 +312,7 @@ public final class SpoutSession implements Session {
 
 	@Override
 	public void dispose() {
-		dispose(new PlayerLeaveEvent(player, getDefaultLeaveMessage()));
+		dispose(new PlayerLeaveEvent(player.getController(), getDefaultLeaveMessage()));
 	}
 
 	public void dispose(PlayerLeaveEvent leaveEvent) {
@@ -328,7 +328,7 @@ public final class SpoutSession implements Session {
 				server.broadcastMessage(text);
 			}
 
-			PlayerSaveEvent saveEvent = getGame().getEventManager().callEvent(new PlayerSaveEvent(player));
+			PlayerSaveEvent saveEvent = getGame().getEventManager().callEvent(new PlayerSaveEvent(player.getController()));
 			if (!saveEvent.isSaved()) {
 
 			}
@@ -336,9 +336,9 @@ public final class SpoutSession implements Session {
 			//If its null or can't be get, just ignore it
 			//If disconnect fails, we just ignore it for now.
 			try {
-				final Entity entity = player.getEntity();
-				if (entity != null) {
-					((SpoutWorld) entity.getWorld()).removePlayer(player);
+				final Entity entity = player;
+				if (player != null) {
+					((SpoutWorld) entity.getWorld()).removePlayer(player.getController());
 				}
 				player.disconnect();
 			} catch (Exception e) {

@@ -40,7 +40,6 @@ import org.spout.api.Tickable;
 import org.spout.api.collision.CollisionModel;
 import org.spout.api.entity.component.Controller;
 import org.spout.api.entity.Entity;
-import org.spout.api.entity.component.controller.PlayerController;
 import org.spout.api.entity.EntityComponent;
 import org.spout.api.event.entity.EntityControllerChangeEvent;
 import org.spout.api.geo.LoadOption;
@@ -53,7 +52,7 @@ import org.spout.api.math.MathHelper;
 import org.spout.api.math.Quaternion;
 import org.spout.api.math.Vector3;
 import org.spout.api.model.Model;
-import org.spout.api.player.Player;
+import org.spout.api.player.PlayerController;
 import org.spout.engine.SpoutConfiguration;
 import org.spout.engine.SpoutEngine;
 import org.spout.engine.protocol.SpoutSession;
@@ -139,7 +138,7 @@ public class SpoutEntity implements Entity, Tickable {
 		Controller cont = controllerLive.get();
 		//Pulse all player messages here, so they can interact with the entities position safely
 		if (cont instanceof PlayerController) {
-			Player player = ((PlayerController)cont).getPlayer();
+			PlayerController player = (PlayerController) controller;
 			if (player != null && player.getSession() != null) {
 				((SpoutSession) player.getSession()).pulse();
 			}
@@ -506,9 +505,9 @@ public class SpoutEntity implements Entity, Tickable {
 				//Kill old controller
 				controller.onDeath();
 				if (controller instanceof PlayerController) {
-					Player p = ((PlayerController) controller).getPlayer();
+					PlayerController p = (PlayerController) controller;
 					if (p != null) {
-						p.getNetworkSynchronizer().onDeath();
+						p.getParent().getNetworkSynchronizer().onDeath();
 					}
 				}
 			}
@@ -517,9 +516,9 @@ public class SpoutEntity implements Entity, Tickable {
 				//Kill old controller
 				controller.onDeath();
 				if (controller instanceof PlayerController) {
-					Player p = ((PlayerController) controller).getPlayer();
+					PlayerController p = (PlayerController) controller;
 					if (p != null) {
-						p.getNetworkSynchronizer().onDeath();
+						p.getParent().getNetworkSynchronizer().onDeath();
 					}
 				}
 				
@@ -573,8 +572,8 @@ public class SpoutEntity implements Entity, Tickable {
 	private void removeObserver() {
 		//Player view distance is handled in the network synchronizer
 		if (controllerLive.get() instanceof PlayerController) {
-			Player p = ((PlayerController)controllerLive.get()).getPlayer();
-			p.getNetworkSynchronizer().onDeath();
+			PlayerController p = (PlayerController)controllerLive.get();
+			p.getParent().getNetworkSynchronizer().onDeath();
 			return;
 		}
 		for (SpoutChunk chunk : observingChunks) {

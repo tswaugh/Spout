@@ -35,8 +35,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import org.spout.api.datatable.GenericDatatableMap;
 import org.spout.api.entity.component.Controller;
-import org.spout.api.entity.component.controller.PlayerController;
-import org.spout.api.player.Player;
+import org.spout.api.player.PlayerController;
 import org.spout.api.protocol.NetworkSynchronizer;
 import org.spout.api.util.StringMap;
 
@@ -211,7 +210,7 @@ public class EntityManager implements Iterable<SpoutEntity> {
 				continue;
 			}
 
-			Player p = ((PlayerController) controller).getPlayer();
+			PlayerController p = (PlayerController) controller;
 			NetworkSynchronizer n = ((SpoutPlayer) p).getNetworkSynchronizer();
 			if (n != null) {
 				n.finalizeTick();
@@ -225,8 +224,8 @@ public class EntityManager implements Iterable<SpoutEntity> {
 			if (controller != null) {
 				controller.preSnapshot();
 				if (controller instanceof PlayerController) {
-					Player p = ((PlayerController) controller).getPlayer();
-					NetworkSynchronizer n = p.getNetworkSynchronizer();
+					PlayerController p = (PlayerController) controller;
+					NetworkSynchronizer n = p.getParent().getNetworkSynchronizer();
 					if (n != null) {
 						n.preSnapshot();
 					}

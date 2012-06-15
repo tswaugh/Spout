@@ -46,7 +46,6 @@ import org.spout.api.datatable.DatatableMap;
 import org.spout.api.datatable.GenericDatatableMap;
 import org.spout.api.entity.Entity;
 import org.spout.api.entity.component.controller.BlockController;
-import org.spout.api.entity.component.controller.PlayerController;
 import org.spout.api.event.block.BlockChangeEvent;
 import org.spout.api.generator.Populator;
 import org.spout.api.generator.WorldGeneratorUtils;
@@ -66,7 +65,7 @@ import org.spout.api.material.block.BlockFullState;
 import org.spout.api.material.block.BlockSnapshot;
 import org.spout.api.math.MathHelper;
 import org.spout.api.math.Vector3;
-import org.spout.api.player.Player;
+import org.spout.api.player.PlayerController;
 import org.spout.api.protocol.NetworkSynchronizer;
 import org.spout.api.scheduler.TickStage;
 import org.spout.api.util.cuboid.CuboidBuffer;
@@ -981,11 +980,11 @@ public class SpoutChunk extends Chunk {
 				}
 				// Player Network sync
 				if (p.getController() instanceof PlayerController) {
-					Player player = ((PlayerController) p.getController()).getPlayer();
+					PlayerController player = (PlayerController) p.getController();
 
-					NetworkSynchronizer n = player.getNetworkSynchronizer();
+					NetworkSynchronizer n = player.getParent().getNetworkSynchronizer();
 					for (Entity e : entitiesSnapshot) {
-						if (player.getEntity().equals(e)) {
+						if (player.getParent().equals(e)) {
 							continue;
 						}
 						int entityViewDistanceOld = ((SpoutEntity) e).getPrevViewDistance();
@@ -1036,8 +1035,8 @@ public class SpoutChunk extends Chunk {
 					int entityViewDistanceOld = ((SpoutEntity) e).getPrevViewDistance();
 					int entityViewDistanceNew = e.getViewDistance();
 
-					Player player = ((PlayerController) p.getController()).getPlayer();
-					NetworkSynchronizer n = player.getNetworkSynchronizer();
+					PlayerController player = (PlayerController) p.getController();
+					NetworkSynchronizer n = player.getParent().getNetworkSynchronizer();
 
 					if (n == null) {
 						continue;
@@ -1056,8 +1055,8 @@ public class SpoutChunk extends Chunk {
 		for (Map.Entry<Entity, Integer> entry : observerLive.entrySet()) {
 			Entity p = entry.getKey();
 			if (p.getController() instanceof PlayerController) {
-				Player player = ((PlayerController) p.getController()).getPlayer();
-				NetworkSynchronizer n = player.getNetworkSynchronizer();
+				PlayerController player = (PlayerController) p.getController();
+				NetworkSynchronizer n = player.getParent().getNetworkSynchronizer();
 				if (n != null) {
 					int playerDistance = entry.getValue();
 					Entity playerEntity = p;

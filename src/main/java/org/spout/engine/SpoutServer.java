@@ -45,7 +45,6 @@ import org.spout.api.protocol.Session;
 import org.spout.api.protocol.bootstrap.BootstrapProtocol;
 
 import org.spout.engine.filesystem.ServerFileSystem;
-import org.spout.engine.filesystem.SharedFileSystem;
 import org.spout.engine.protocol.SpoutSession;
 import org.spout.engine.util.bans.BanManager;
 import org.spout.engine.util.bans.FlatFileBanManager;

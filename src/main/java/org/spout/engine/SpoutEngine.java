@@ -84,6 +84,7 @@ import org.spout.api.material.MaterialRegistry;
 import org.spout.api.permissions.DefaultPermissions;
 import org.spout.api.permissions.PermissionsSubject;
 import org.spout.api.player.Player;
+import org.spout.api.player.PlayerController;
 import org.spout.api.plugin.CommonPluginLoader;
 import org.spout.api.plugin.CommonPluginManager;
 import org.spout.api.plugin.CommonServiceManager;
@@ -101,7 +102,6 @@ import org.spout.engine.command.AdministrationCommands;
 import org.spout.engine.command.MessagingCommands;
 import org.spout.engine.command.TestCommands;
 import org.spout.engine.entity.EntityManager;
-import org.spout.engine.entity.SpoutEntity;
 import org.spout.engine.filesystem.SharedFileSystem;
 import org.spout.engine.filesystem.WorldFiles;
 import org.spout.engine.player.SpoutPlayer;
@@ -138,7 +138,7 @@ public class SpoutEngine extends AsyncManager implements Engine {
 	private final RecipeManager recipeManager = new CommonRecipeManager();
 	private final ServiceManager serviceManager = CommonServiceManager.getInstance();
 	private final SnapshotManager snapshotManager = new SnapshotManager();
-	private final SnapshotableLinkedHashMap<String, SpoutPlayer> onlinePlayers = new SnapshotableLinkedHashMap<String, SpoutPlayer>(snapshotManager);
+	private final SnapshotableLinkedHashMap<String, PlayerController> onlinePlayers = new SnapshotableLinkedHashMap<String, PlayerController>(snapshotManager);
 	private final RootCommand rootCommand = new RootCommand(this);
 	private final WorldGenerator defaultGenerator = new EmptyWorldGenerator();
 
@@ -160,7 +160,7 @@ public class SpoutEngine extends AsyncManager implements Engine {
 	private File worldFolder = new File(".");
 	private SnapshotableLinkedHashMap<String, SpoutWorld> loadedWorlds = new SnapshotableLinkedHashMap<String, SpoutWorld>(snapshotManager);
 	private SnapshotableReference<World> defaultWorld = new SnapshotableReference<World>(snapshotManager, null);
-	private SpoutPlayer[] emptyPlayerArray = new SpoutPlayer[0];
+	private PlayerController[] emptyPlayerArray = new PlayerController[0];
 	private String logFile;
 	private StringMap engineItemMap = null;
 	private StringMap engineBiomeMap = null;
@@ -264,7 +264,7 @@ public class SpoutEngine extends AsyncManager implements Engine {
 		}
 	}
 
-	public Collection<SpoutPlayer> rawGetAllOnlinePlayers() {
+	public Collection<PlayerController> rawGetAllOnlinePlayers() {
 		return onlinePlayers.get().values();
 	}
 
@@ -285,10 +285,10 @@ public class SpoutEngine extends AsyncManager implements Engine {
 	}
 
 	@Override
-	public SpoutPlayer[] getOnlinePlayers() {
-		Map<String, SpoutPlayer> playerList = onlinePlayers.get();
-		ArrayList<SpoutPlayer> onlinePlayers = new ArrayList<SpoutPlayer>(playerList.size());
-		for (SpoutPlayer player : playerList.values()) {
+	public PlayerController[] getOnlinePlayers() {
+		Map<String, PlayerController> playerList = onlinePlayers.get();
+		ArrayList<PlayerController> onlinePlayers = new ArrayList<PlayerController>(playerList.size());
+		for (PlayerController player : playerList.values()) {
 			if (player.isOnline()) {
 				onlinePlayers.add(player);
 			}
@@ -387,18 +387,18 @@ public class SpoutEngine extends AsyncManager implements Engine {
 	}
 
 	@Override
-	public Player getPlayer(String name, boolean exact) {
+	public PlayerController getPlayer(String name, boolean exact) {
 		name = name.toLowerCase();
 		if (exact) {
-			for (Player player : onlinePlayers.getValues()) {
+			for (PlayerController player : onlinePlayers.getValues()) {
 				if (player.getName().equalsIgnoreCase(name)) {
 					return player;
 				}
 			}
 		} else {
 			int shortestMatch = Integer.MAX_VALUE;
-			Player shortestPlayer = null;
-			for (Player player : onlinePlayers.getValues()) {
+			PlayerController shortestPlayer = null;
+			for (PlayerController player : onlinePlayers.getValues()) {
 				if (player.getName().toLowerCase().startsWith(name)) {
 					if (player.getName().length() < shortestMatch) {
 						shortestMatch = player.getName().length();
@@ -412,9 +412,9 @@ public class SpoutEngine extends AsyncManager implements Engine {
 	}
 
 	@Override
-	public Collection<Player> matchPlayer(String name) {
-		List<Player> result = new ArrayList<Player>();
-		for (Player player : getOnlinePlayers()) {
+	public Collection<PlayerController> matchPlayer(String name) {
+		List<PlayerController> result = new ArrayList<PlayerController>();
+		for (PlayerController player : getOnlinePlayers()) {
 			if (player.getName().startsWith(name)) {
 				result.add(player);
 			}
@@ -502,7 +502,7 @@ public class SpoutEngine extends AsyncManager implements Engine {
 	@Override
 	public void stop(String message) {
 		setupComplete.set(false);
-		for (SpoutPlayer player : getOnlinePlayers()) {
+		for (PlayerController player : getOnlinePlayers()) {
 			player.kick(message);
 		}
 
@@ -621,7 +621,7 @@ public class SpoutEngine extends AsyncManager implements Engine {
 	public void copySnapshotRun() throws InterruptedException {
 		entityManager.copyAllSnapshots();
 		snapshotManager.copyAllSnapshots();
-		for (Player player : onlinePlayers.get().values()) {
+		for (PlayerController player : onlinePlayers.get().values()) {
 			((SpoutPlayer) player).copyToSnapshot();
 		}
 	}
@@ -738,24 +738,22 @@ public class SpoutEngine extends AsyncManager implements Engine {
 	}
 
 	// Players should use weak map?
-	public Player addPlayer(String playerName, SpoutSession session) {
-		SpoutPlayer player = null;
+	public Player addPlayer(PlayerController player, String playerName, SpoutSession session) {
 
 		// The new player needs a corresponding entity
-		SpoutEntity newEntity = new SpoutEntity(this, getDefaultWorld().getSpawnPoint(), null);
+		Player newEntity = new SpoutPlayer(playerName, session, this, getDefaultWorld().getSpawnPoint(), player);
 
 		while (true) {
 			player = onlinePlayers.getLive().get(playerName);
 
 			if (player != null) {
-				if (!player.connect(session, newEntity)) {
+				if (!((SpoutPlayer) player.getParent()).connect(session, newEntity)) {
 					return null;
 				}
 
 				break;
 			}
 
-			player = new SpoutPlayer(playerName, newEntity, session);
 			if (onlinePlayers.putIfAbsent(playerName, player) == null) {
 				break;
 			}
@@ -763,9 +761,9 @@ public class SpoutEngine extends AsyncManager implements Engine {
 
 		World world = newEntity.getWorld();
 		world.spawnEntity(newEntity);
-		session.setPlayer(player);
+		session.setPlayer((SpoutPlayer) player.getParent());
 		((SpoutWorld) world).addPlayer(player);
-		return player;
+		return player.getParent();
 	}
 
 	protected Collection<SpoutWorld> getLiveWorlds() {

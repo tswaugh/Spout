@@ -52,7 +52,6 @@ import org.spout.api.Spout;
 import org.spout.api.entity.Entity;
 import org.spout.api.entity.component.Controller;
 import org.spout.api.entity.component.controller.BlockController;
-import org.spout.api.entity.component.controller.PlayerController;
 import org.spout.api.event.chunk.ChunkLoadEvent;
 import org.spout.api.event.chunk.ChunkPopulateEvent;
 import org.spout.api.event.chunk.ChunkUnloadEvent;
@@ -71,6 +70,7 @@ import org.spout.api.material.BlockMaterial;
 import org.spout.api.material.DynamicUpdateEntry;
 import org.spout.api.math.Vector3;
 import org.spout.api.player.Player;
+import org.spout.api.player.PlayerController;
 import org.spout.api.protocol.NetworkSynchronizer;
 import org.spout.api.scheduler.TaskManager;
 import org.spout.api.util.cuboid.CuboidShortBuffer;
@@ -738,8 +738,7 @@ public class SpoutRegion extends Region{
 		entityManager.finalizeRun();
 	}
 
-	private void syncChunkToPlayers(SpoutChunk chunk, Entity entity) {
-		SpoutPlayer player = (SpoutPlayer) ((PlayerController) entity.getController()).getPlayer();
+	private void syncChunkToPlayers(SpoutChunk chunk, SpoutPlayer player) {
 		NetworkSynchronizer synchronizer = player.getNetworkSynchronizer();
 		if (synchronizer != null) {
 			if (!chunk.isDirtyOverflow() && !chunk.isLightDirty()) {
@@ -806,7 +805,7 @@ public class SpoutRegion extends Region{
 							if (!(entity.getController() instanceof PlayerController)) {
 								continue;
 							}
-							syncChunkToPlayers(spoutChunk, entity);
+							syncChunkToPlayers(spoutChunk, (SpoutPlayer) entity);
 						}
 						processChunkUpdatedEvent(spoutChunk);
 
@@ -1121,11 +1120,11 @@ public class SpoutRegion extends Region{
 	}
 
 	@Override
-	public Set<Player> getPlayers() {
-		HashSet<Player> players = new HashSet<Player>();
+	public Set<PlayerController> getPlayers() {
+		HashSet<PlayerController> players = new HashSet<PlayerController>();
 		for (PlayerController player : this.entityManager.getPlayers()) {
-			if (player.getPlayer() != null) {
-				players.add(player.getPlayer());
+			if (player != null) {
+				players.add(player);
 			}
 		}
 		return players;

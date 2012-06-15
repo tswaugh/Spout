@@ -38,6 +38,7 @@ import org.spout.api.command.annotated.Command;
 import org.spout.api.command.annotated.CommandPermissions;
 import org.spout.api.exception.CommandException;
 import org.spout.api.player.Player;
+import org.spout.api.player.PlayerController;
 import org.spout.api.plugin.Plugin;
 
 import org.spout.engine.SpoutServer;
@@ -88,7 +89,7 @@ public class AdministrationCommands {
 			message = args.getJoinedString(1);
 		}
 
-		Player player = Spout.getEngine().getPlayer(playerName, true);
+		PlayerController player = Spout.getEngine().getPlayer(playerName, true);
 		if (player.isOnline()) {
 			player.kick(message);
 			source.sendMessage(ChatColor.BRIGHT_GREEN + "Kicked player '" + player.getName() + (!message.isEmpty() ? "' for reason '" + message + "'" : "'"));

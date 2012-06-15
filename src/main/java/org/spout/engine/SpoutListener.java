@@ -42,6 +42,7 @@ import org.spout.api.event.server.BanChangeEvent.BanType;
 import org.spout.api.event.server.permissions.PermissionGetAllWithNodeEvent;
 import org.spout.api.event.storage.PlayerLoadEvent;
 import org.spout.api.player.Player;
+import org.spout.api.player.PlayerController;
 
 import org.spout.engine.protocol.SpoutSession;
 
@@ -58,14 +59,14 @@ public class SpoutListener implements Listener {
 			return;
 		}
 		//Create the player
-		final Player player = server.addPlayer(event.getPlayerName(), (SpoutSession) event.getSession());
+		final Player player = server.addPlayer(event.getController(), event.getPlayerName(), (SpoutSession) event.getSession());
 
 		if (player != null) {
-			PlayerLoadEvent loadEvent = Spout.getEngine().getEventManager().callEvent(new PlayerLoadEvent(player));
+			PlayerLoadEvent loadEvent = Spout.getEngine().getEventManager().callEvent(new PlayerLoadEvent(player.getController()));
 			if (!loadEvent.isLoaded()) {
 
 			}
-			PlayerLoginEvent loginEvent = Spout.getEngine().getEventManager().callEvent(new PlayerLoginEvent(player));
+			PlayerLoginEvent loginEvent = Spout.getEngine().getEventManager().callEvent(new PlayerLoginEvent(player.getController()));
 			if (!loginEvent.isAllowed()) {
 				if (loginEvent.getMessage() != null) {
 					player.kick(loginEvent.getMessage());
@@ -73,7 +74,7 @@ public class SpoutListener implements Listener {
 					player.kick();
 				}
 			} else {
-				Spout.getEngine().getEventManager().callDelayedEvent(new PlayerJoinEvent(player, ChatColor.CYAN + player.getDisplayName() + ChatColor.CYAN + " has joined the game"));
+				Spout.getEngine().getEventManager().callDelayedEvent(new PlayerJoinEvent(player.getController(), ChatColor.CYAN + player.getDisplayName() + ChatColor.CYAN + " has joined the game"));
 			}
 		} else {
 			event.getSession().disconnect("Player is already online");
@@ -82,19 +83,19 @@ public class SpoutListener implements Listener {
 
 	@EventHandler(order = Order.EARLIEST)
 	public void onPlayerLogin(PlayerLoginEvent event) {
-		Player p = event.getPlayer();
+		PlayerController p = event.getPlayer();
 		PlayerBanKickEvent banEvent = null;
-		InetAddress address = p.getAddress();
+		InetAddress address = p.getParent().getAddress();
 		if (address == null) {
 			event.disallow("Invalid IP Address!");
 		} else if (server.isPlayerBanned(p.getName())) {
 			banEvent = server.getEventManager().callEvent(new PlayerBanKickEvent(p, BanType.PLAYER, server.getBanMessage(p.getName())));
 		} else if (server.isIpBanned(address.getHostAddress())) {
-			banEvent = server.getEventManager().callEvent(new PlayerBanKickEvent(p, BanType.IP, server.getIpBanMessage(p.getAddress().getHostAddress())));
+			banEvent = server.getEventManager().callEvent(new PlayerBanKickEvent(p, BanType.IP, server.getIpBanMessage(p.getParent().getAddress().getHostAddress())));
 		}
 
 		if (banEvent != null && !banEvent.isCancelled()) {
-			event.disallow(!banEvent.getMessage().equals("") ? banEvent.getMessage() : (banEvent.getBanType() == BanType.PLAYER) ? server.getBanMessage(p.getName()) : server.getIpBanMessage(p.getAddress().getHostAddress()));
+			event.disallow(!banEvent.getMessage().equals("") ? banEvent.getMessage() : (banEvent.getBanType() == BanType.PLAYER) ? server.getBanMessage(p.getName()) : server.getIpBanMessage(p.getParent().getAddress().getHostAddress()));
 			return;
 		}
 
@@ -112,8 +113,8 @@ public class SpoutListener implements Listener {
 
 	@EventHandler(order = Order.EARLIEST)
 	public void onGetAllWithNode(PermissionGetAllWithNodeEvent event) {
-		for (Player player : server.getOnlinePlayers()) {
-			event.getReceivers().put(player, Result.DEFAULT);
+		for (PlayerController player : server.getOnlinePlayers()) {
+			event.getReceivers().put(player.getParent(), Result.DEFAULT);
 		}
 		event.getReceivers().put(server.getConsole(), Result.DEFAULT);
 	}

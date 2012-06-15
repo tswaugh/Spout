@@ -70,7 +70,7 @@ import org.spout.api.material.DynamicUpdateEntry;
 import org.spout.api.math.MathHelper;
 import org.spout.api.math.Quaternion;
 import org.spout.api.math.Vector3;
-import org.spout.api.player.Player;
+import org.spout.api.player.PlayerController;
 import org.spout.api.plugin.Plugin;
 import org.spout.api.scheduler.TaskManager;
 import org.spout.api.util.StringMap;
@@ -137,7 +137,7 @@ public final class SpoutWorld extends AsyncManager implements World {
 	/**
 	 * A set of all players currently connected to this world
 	 */
-	private final Set<Player> players = Collections.newSetFromMap(new ConcurrentHashMap<Player, Boolean>());
+	private final Set<PlayerController> players = Collections.newSetFromMap(new ConcurrentHashMap<PlayerController, Boolean>());
 	/**
 	 * A map of the loaded columns
 	 */
@@ -653,16 +653,16 @@ public final class SpoutWorld extends AsyncManager implements World {
 		return entity;
 	}
 
-	public void addPlayer(Player player) {
+	public void addPlayer(PlayerController player) {
 		players.add(player);
 	}
 
-	public void removePlayer(Player player) {
+	public void removePlayer(PlayerController player) {
 		players.remove(player);
 	}
 
 	@Override
-	public Set<Player> getPlayers() {
+	public Set<PlayerController> getPlayers() {
 		return Collections.unmodifiableSet(players);
 	}
 
@@ -919,7 +919,7 @@ public final class SpoutWorld extends AsyncManager implements World {
 	 */
 	@LiveRead
 	@Threadsafe
-	public Set<Player> getNearbyPlayers(Point position, int range) {
+	public Set<PlayerController> getNearbyPlayers(Point position, int range) {
 		return getNearbyPlayers(position, null, range);
 	}
 
@@ -932,7 +932,7 @@ public final class SpoutWorld extends AsyncManager implements World {
 	 */
 	@LiveRead
 	@Threadsafe
-	public Set<Player> getNearbyPlayers(Entity entity, int range) {
+	public Set<PlayerController> getNearbyPlayers(Entity entity, int range) {
 		return getNearbyPlayers(entity.getPosition(), entity, range);
 	}
 
@@ -947,13 +947,13 @@ public final class SpoutWorld extends AsyncManager implements World {
 	 */
 	@LiveRead
 	@Threadsafe
-	public Set<Player> getNearbyPlayers(Point position, Entity ignore, int range) {
-		Set<Player> foundPlayers = new HashSet<Player>();
+	public Set<PlayerController> getNearbyPlayers(Point position, Entity ignore, int range) {
+		Set<PlayerController> foundPlayers = new HashSet<PlayerController>();
 		final int RANGE_SQUARED = range * range;
 
-		for (Player plr : getPlayersNearRegion(position, range)) {
-			if (plr.getEntity() != ignore && plr.getEntity() != null) {
-				double distance = MathHelper.distanceSquared(position, plr.getEntity().getPosition());
+		for (PlayerController plr : getPlayersNearRegion(position, range)) {
+			if (plr.getParent() != ignore && plr.getParent() != null) {
+				double distance = MathHelper.distanceSquared(position, plr.getParent().getPosition());
 				if (distance < RANGE_SQUARED) {
 					foundPlayers.add(plr);
 				}
@@ -970,11 +970,11 @@ public final class SpoutWorld extends AsyncManager implements World {
 	 * @param range to search for regions
 	 * @return nearby region's players
 	 */
-	private Set<Player> getPlayersNearRegion(Point position, int range) {
+	private Set<PlayerController> getPlayersNearRegion(Point position, int range) {
 		Region center = this.getRegionFromBlock(position, LoadOption.NO_LOAD);
 
 		if (center != null) {
-			HashSet<Player> players = new HashSet<Player>();
+			HashSet<PlayerController> players = new HashSet<PlayerController>();
 			final int regions = (range + Region.BLOCKS.SIZE - 1) / Region.BLOCKS.SIZE; //round up 1 region size
 			for (int dx = -regions; dx < regions; dx++) {
 				for (int dy = -regions; dy < regions; dy++) {
@@ -999,13 +999,13 @@ public final class SpoutWorld extends AsyncManager implements World {
 	 */
 	@LiveRead
 	@Threadsafe
-	public Player getNearestPlayer(Point position, Entity ignore, int range) {
-		Player best = null;
+	public PlayerController getNearestPlayer(Point position, Entity ignore, int range) {
+		PlayerController best = null;
 		double bestDistance = range * range;
 
-		for (Player plr : getPlayersNearRegion(position, range)) {
-			if (plr.getEntity() != ignore && plr.getEntity() != null) {
-				double distance = MathHelper.distanceSquared(position, plr.getEntity().getPosition());
+		for (PlayerController plr : getPlayersNearRegion(position, range)) {
+			if (plr.getParent() != ignore && plr.getParent() != null) {
+				double distance = MathHelper.distanceSquared(position, plr.getParent().getPosition());
 				if (distance < bestDistance) {
 					bestDistance = distance;
 					best = plr;
@@ -1025,7 +1025,7 @@ public final class SpoutWorld extends AsyncManager implements World {
 	 */
 	@LiveRead
 	@Threadsafe
-	public Player getNearestPlayer(Point position, int range) {
+	public PlayerController getNearestPlayer(Point position, int range) {
 		return getNearestPlayer(position, null, range);
 	}
 
@@ -1038,7 +1038,7 @@ public final class SpoutWorld extends AsyncManager implements World {
 	 */
 	@LiveRead
 	@Threadsafe
-	public Player getNearestPlayer(Entity entity, int range) {
+	public PlayerController getNearestPlayer(Entity entity, int range) {
 		return getNearestPlayer(entity.getPosition(), entity, range);
 	}
 
