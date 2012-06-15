@@ -258,14 +258,14 @@ public final class SpoutSession implements Session {
 		if (player != null) {
 			PlayerLeaveEvent event;
 			if (kick) {
-				event = getGame().getEventManager().callEvent(new PlayerKickEvent(player.getController(), getDefaultLeaveMessage(), reason));
+				event = getGame().getEventManager().callEvent(new PlayerKickEvent(player, getDefaultLeaveMessage(), reason));
 				if (event.isCancelled()) {
 					return false;
 				}
 
 				getGame().getLogger().log(Level.INFO, "Player {0} kicked: {1}", new Object[]{player.getName(), reason});
 			} else {
-				event = new PlayerLeaveEvent(player.getController(), getDefaultLeaveMessage());
+				event = new PlayerLeaveEvent(player, getDefaultLeaveMessage());
 			}
 			dispose(event);
 		}
@@ -312,7 +312,7 @@ public final class SpoutSession implements Session {
 
 	@Override
 	public void dispose() {
-		dispose(new PlayerLeaveEvent(player.getController(), getDefaultLeaveMessage()));
+		dispose(new PlayerLeaveEvent(player, getDefaultLeaveMessage()));
 	}
 
 	public void dispose(PlayerLeaveEvent leaveEvent) {

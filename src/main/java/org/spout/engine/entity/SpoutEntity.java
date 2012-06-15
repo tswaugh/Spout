@@ -52,6 +52,7 @@ import org.spout.api.math.MathHelper;
 import org.spout.api.math.Quaternion;
 import org.spout.api.math.Vector3;
 import org.spout.api.model.Model;
+import org.spout.api.player.Player;
 import org.spout.api.player.PlayerController;
 import org.spout.engine.SpoutConfiguration;
 import org.spout.engine.SpoutEngine;
@@ -138,7 +139,7 @@ public class SpoutEntity implements Entity, Tickable {
 		Controller cont = controllerLive.get();
 		//Pulse all player messages here, so they can interact with the entities position safely
 		if (cont instanceof PlayerController) {
-			PlayerController player = (PlayerController) controller;
+			Player player = (Player) controller.getParent();
 			if (player != null && player.getSession() != null) {
 				((SpoutSession) player.getSession()).pulse();
 			}

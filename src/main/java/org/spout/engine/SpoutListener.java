@@ -62,11 +62,11 @@ public class SpoutListener implements Listener {
 		final Player player = server.addPlayer(event.getController(), event.getPlayerName(), (SpoutSession) event.getSession());
 
 		if (player != null) {
-			PlayerLoadEvent loadEvent = Spout.getEngine().getEventManager().callEvent(new PlayerLoadEvent(player.getController()));
+			PlayerLoadEvent loadEvent = Spout.getEngine().getEventManager().callEvent(new PlayerLoadEvent(player));
 			if (!loadEvent.isLoaded()) {
 
 			}
-			PlayerLoginEvent loginEvent = Spout.getEngine().getEventManager().callEvent(new PlayerLoginEvent(player.getController()));
+			PlayerLoginEvent loginEvent = Spout.getEngine().getEventManager().callEvent(new PlayerLoginEvent(player));
 			if (!loginEvent.isAllowed()) {
 				if (loginEvent.getMessage() != null) {
 					player.kick(loginEvent.getMessage());
@@ -74,7 +74,7 @@ public class SpoutListener implements Listener {
 					player.kick();
 				}
 			} else {
-				Spout.getEngine().getEventManager().callDelayedEvent(new PlayerJoinEvent(player.getController(), ChatColor.CYAN + player.getDisplayName() + ChatColor.CYAN + " has joined the game"));
+				Spout.getEngine().getEventManager().callDelayedEvent(new PlayerJoinEvent(player, ChatColor.CYAN + player.getDisplayName() + ChatColor.CYAN + " has joined the game"));
 			}
 		} else {
 			event.getSession().disconnect("Player is already online");
@@ -83,19 +83,19 @@ public class SpoutListener implements Listener {
 
 	@EventHandler(order = Order.EARLIEST)
 	public void onPlayerLogin(PlayerLoginEvent event) {
-		PlayerController p = event.getPlayer();
+		Player p = event.getPlayer();
 		PlayerBanKickEvent banEvent = null;
-		InetAddress address = p.getParent().getAddress();
+		InetAddress address = p.getAddress();
 		if (address == null) {
 			event.disallow("Invalid IP Address!");
 		} else if (server.isPlayerBanned(p.getName())) {
 			banEvent = server.getEventManager().callEvent(new PlayerBanKickEvent(p, BanType.PLAYER, server.getBanMessage(p.getName())));
 		} else if (server.isIpBanned(address.getHostAddress())) {
-			banEvent = server.getEventManager().callEvent(new PlayerBanKickEvent(p, BanType.IP, server.getIpBanMessage(p.getParent().getAddress().getHostAddress())));
+			banEvent = server.getEventManager().callEvent(new PlayerBanKickEvent(p, BanType.IP, server.getIpBanMessage(p.getAddress().getHostAddress())));
 		}
 
 		if (banEvent != null && !banEvent.isCancelled()) {
-			event.disallow(!banEvent.getMessage().equals("") ? banEvent.getMessage() : (banEvent.getBanType() == BanType.PLAYER) ? server.getBanMessage(p.getName()) : server.getIpBanMessage(p.getParent().getAddress().getHostAddress()));
+			event.disallow(!banEvent.getMessage().equals("") ? banEvent.getMessage() : (banEvent.getBanType() == BanType.PLAYER) ? server.getBanMessage(p.getName()) : server.getIpBanMessage(p.getAddress().getHostAddress()));
 			return;
 		}
 
@@ -113,8 +113,8 @@ public class SpoutListener implements Listener {
 
 	@EventHandler(order = Order.EARLIEST)
 	public void onGetAllWithNode(PermissionGetAllWithNodeEvent event) {
-		for (PlayerController player : server.getOnlinePlayers()) {
-			event.getReceivers().put(player.getParent(), Result.DEFAULT);
+		for (Player player : server.getOnlinePlayers()) {
+			event.getReceivers().put(player, Result.DEFAULT);
 		}
 		event.getReceivers().put(server.getConsole(), Result.DEFAULT);
 	}

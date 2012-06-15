@@ -32,6 +32,7 @@ import org.spout.api.command.CommandSource;
 import org.spout.api.command.annotated.Command;
 import org.spout.api.command.annotated.CommandPermissions;
 import org.spout.api.exception.CommandException;
+import org.spout.api.player.Player;
 import org.spout.api.player.PlayerController;
 
 import org.spout.engine.SpoutServer;
@@ -51,8 +52,8 @@ public class MessagingCommands {
 	public void say(CommandContext args, CommandSource source) {
 		String message = args.getJoinedString(0);
 		if (!message.isEmpty()) {
-			if (source instanceof PlayerController) {
-				((PlayerController) source).chat(message);
+			if (source instanceof Player) {
+				((Player) source).chat(message);
 			} else {
 				server.broadcastMessage("<" + source.getName() + "> " + message);
 			}
@@ -64,12 +65,12 @@ public class MessagingCommands {
 	public void tell(CommandContext args, CommandSource source) throws CommandException {
 		String playerName = args.getString(0);
 		String message = args.getJoinedString(1);
-		PlayerController player = server.getPlayer(playerName, false);
+		Player player = server.getPlayer(playerName, false);
 		if (player == source) {
 			source.sendMessage("Forever alone.");
 		} else if (player != null) {
 			source.sendMessage("To " + ChatColor.BRIGHT_GREEN + player.getName() + ChatColor.WHITE + ": " + message);
-			player.getParent().sendMessage("From " + ChatColor.BRIGHT_GREEN + source.getName() + ChatColor.WHITE + ": " + message);
+			player.sendMessage("From " + ChatColor.BRIGHT_GREEN + source.getName() + ChatColor.WHITE + ": " + message);
 		} else {
 			throw new CommandException(ChatColor.RED + "Player '" + playerName + "' not found.");
 		}

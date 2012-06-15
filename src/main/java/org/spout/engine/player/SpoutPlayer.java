@@ -117,7 +117,7 @@ public class SpoutPlayer extends SpoutEntity implements Player {
 	}
 
 	@DelayedWrite
-	public boolean connect(SpoutSession session, Player newEntity) {
+	public boolean connect(SpoutSession session) {
 		if (!onlineLive.compareAndSet(false, true)) {
 			// player was already online
 			return false;
@@ -134,7 +134,7 @@ public class SpoutPlayer extends SpoutEntity implements Player {
 		if (message.startsWith("/")) {
 			Spout.getEngine().processCommand(this, message.substring(1));
 		} else {
-			PlayerChatEvent event = Spout.getEngine().getEventManager().callEvent(new PlayerChatEvent(this.getController(), message));
+			PlayerChatEvent event = Spout.getEngine().getEventManager().callEvent(new PlayerChatEvent(this, message));
 			if (event.isCancelled()) {
 				return;
 			}
