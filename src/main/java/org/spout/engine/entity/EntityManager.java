@@ -35,6 +35,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import org.spout.api.datatable.GenericDatatableMap;
 import org.spout.api.entity.component.Controller;
+import org.spout.api.player.Player;
 import org.spout.api.player.PlayerController;
 import org.spout.api.protocol.NetworkSynchronizer;
 import org.spout.api.util.StringMap;
@@ -62,7 +63,7 @@ public class EntityManager implements Iterable<SpoutEntity> {
 	 */
 	private final ConcurrentHashMap<Class<? extends Controller>, SnapshotableHashSet<SpoutEntity>> groupedEntities = new ConcurrentHashMap<Class<? extends Controller>, SnapshotableHashSet<SpoutEntity>>();
 	
-	private final SnapshotableHashSet<PlayerController> players = new SnapshotableHashSet<PlayerController>(snapshotManager);
+	private final SnapshotableHashSet<Player> players = new SnapshotableHashSet<Player>(snapshotManager);
 	/**
 	 * The next id to check.
 	 */
@@ -157,8 +158,8 @@ public class EntityManager implements Iterable<SpoutEntity> {
 
 		if (entity.getController() != null) {
 			getRawAll(entity.getController().getClass()).add(entity);
-			if (entity.getController() instanceof PlayerController) {
-				players.add((PlayerController)entity.getController());
+			if (entity instanceof Player) {
+				players.add((Player)entity);
 			}
 		}
 
@@ -175,8 +176,8 @@ public class EntityManager implements Iterable<SpoutEntity> {
 		Controller controller = entity.getController();
 		if (controller != null) {
 			getRawAll(entity.getController().getClass()).remove(entity);
-			if (controller instanceof PlayerController) {
-				players.remove((PlayerController)controller);
+			if (entity instanceof Player) {
+				players.remove((Player)entity);
 			}
 		}
 	}
@@ -186,7 +187,7 @@ public class EntityManager implements Iterable<SpoutEntity> {
 	 * 
 	 * @return players managed by this entity manager
 	 */
-	public Set<PlayerController> getPlayers() {
+	public Set<Player> getPlayers() {
 		return players.get();
 	}
 

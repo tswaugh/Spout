@@ -145,7 +145,7 @@ public class SpoutPlayer extends SpoutEntity implements Player {
 		}
 		this.save();
 		this.shouldSave.set(false);
-		((SpoutWorld) getWorld()).removePlayer(getController());
+		((SpoutWorld) getWorld()).removePlayer(this);
 		this.kill();
 
 		sessionLive.set(null);

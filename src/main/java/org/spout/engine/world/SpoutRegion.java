@@ -1120,9 +1120,9 @@ public class SpoutRegion extends Region{
 	}
 
 	@Override
-	public Set<PlayerController> getPlayers() {
-		HashSet<PlayerController> players = new HashSet<PlayerController>();
-		for (PlayerController player : this.entityManager.getPlayers()) {
+	public Set<Player> getPlayers() {
+		HashSet<Player> players = new HashSet<Player>();
+		for (Player player : this.entityManager.getPlayers()) {
 			if (player != null) {
 				players.add(player);
 			}
