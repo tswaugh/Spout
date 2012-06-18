@@ -7,7 +7,6 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import org.spout.api.Spout;
 import org.spout.api.data.ValueHolder;
-import org.spout.api.entity.Entity;
 import org.spout.api.entity.component.Controller;
 import org.spout.api.event.Result;
 import org.spout.api.event.player.PlayerChatEvent;
@@ -17,13 +16,15 @@ import org.spout.api.event.server.permissions.PermissionGroupEvent;
 import org.spout.api.event.server.permissions.PermissionNodeEvent;
 import org.spout.api.geo.World;
 import org.spout.api.geo.cuboid.Chunk;
+import org.spout.api.geo.discrete.Point;
 import org.spout.api.geo.discrete.Transform;
+import org.spout.api.math.Quaternion;
+import org.spout.api.math.Vector3;
 import org.spout.api.player.Player;
 import org.spout.api.player.PlayerController;
 import org.spout.api.player.PlayerInputState;
 import org.spout.api.protocol.Message;
 import org.spout.api.protocol.NetworkSynchronizer;
-import org.spout.api.protocol.Session;
 import org.spout.api.util.thread.DelayedWrite;
 import org.spout.api.util.thread.SnapshotRead;
 import org.spout.api.util.thread.Threadsafe;
@@ -32,8 +33,27 @@ import org.spout.engine.SpoutEngine;
 import org.spout.engine.entity.SpoutEntity;
 import org.spout.engine.protocol.SpoutSession;
 import org.spout.engine.util.TextWrapper;
+import org.spout.engine.world.SpoutWorld;
 
+/**
+ * Implementation of {@link Player} as a subclass of SpoutEntity
+ *
+ * <strong>How offline players work:</strong>
+ * <p>
+ *     A SpoutEntity that is constructed as offline will have its chunkLive as null,
+ *     which will prevent it from being spawned as an entity. Its session and network
+ *     synchronizer will also be null.
+ * </p>
+ * <strong>Player Data:</strong>
+ * <p>
+ *     Methods in {@link SpoutEntity} and {@link Player} that modify player data should set shouldSave to
+ *     true, which will make sure that data is saved in the player's onTick. Data should
+ *     also be saved when the player is disconnected. Player data should be loaded
+ *     when a player is constructed or a player comes online.
+ * </p>
+ */
 public class SpoutPlayer extends SpoutEntity implements Player {
+	private static final int SAVE_DELAY = 20;
 	private final AtomicReference<SpoutSession> sessionLive = new AtomicReference<SpoutSession>();
 	private SpoutSession session;
 	private final String name;
@@ -44,16 +64,23 @@ public class SpoutPlayer extends SpoutEntity implements Player {
 	private boolean online;
 	private final int hashcode;
 	private final PlayerInputState inputState = new PlayerInputState();
+	private final AtomicBoolean shouldSave = new AtomicBoolean();
+	private int saveTicks;
 
-	public SpoutPlayer(String name, SpoutSession session, SpoutEngine engine, Transform transform, Controller controller) {
-		super(engine, transform, controller, SpoutConfiguration.VIEW_DISTANCE.getInt() * Chunk.BLOCKS.SIZE);
-		sessionLive.set(session);
-		this.session = session;
-		online = true;
-		onlineLive.set(true);
+	public SpoutPlayer(String name, SpoutEngine engine) {
+		super(engine, (Transform) null, null);
 		this.name = name;
 		displayName.set(name);
 		hashcode = name.hashCode();
+		load();
+	}
+
+	public SpoutPlayer(String name, SpoutSession session, SpoutEngine engine, Transform transform, Controller controller) {
+		super(engine, transform, controller, SpoutConfiguration.VIEW_DISTANCE.getInt() * Chunk.BLOCKS.SIZE);
+		this.name = name;
+		displayName.set(name);
+		hashcode = name.hashCode();
+		connect(session);
 	}
 
 	@Override
@@ -104,18 +131,33 @@ public class SpoutPlayer extends SpoutEntity implements Player {
 		return null;
 	}
 
+	/**
+	 * Called when the player disconnects. Handles all the removing the entity from the
+	 * world and marking it as dead.
+	 *
+	 * @return Whether disconnecting the player was successful (whether the player was connected when the method was called)
+	 */
 	@DelayedWrite
 	public boolean disconnect() {
 		if (!onlineLive.compareAndSet(true, false)) {
 			// player was already offline
 			return false;
 		}
+		this.save();
+		this.shouldSave.set(false);
+		((SpoutWorld) getWorld()).removePlayer(getController());
+		this.kill();
 
 		sessionLive.set(null);
 		synchronizerLive.set(null);
 		return true;
 	}
 
+	/**
+	 * Called when a player reconnects. Handles bringing the entity back to life and loading player data.
+	 * @param session The session to connect the player to
+	 * @return Whether connecting the player was successful (whether the player was disconnected when the method was called)
+	 */
 	@DelayedWrite
 	public boolean connect(SpoutSession session) {
 		if (!onlineLive.compareAndSet(false, true)) {
@@ -123,7 +165,11 @@ public class SpoutPlayer extends SpoutEntity implements Player {
 			return false;
 		}
 
+		this.load();
+		setupInitialChunk(transform);
 		sessionLive.set(session);
+		session.setPlayer(this);
+		getWorld().spawnEntity(this);
 
 		copyToSnapshot();
 		return true;
@@ -269,5 +315,48 @@ public class SpoutPlayer extends SpoutEntity implements Player {
 
 	@Override
 	public void onTick(float dt) {
+		if (isOnline()) {
+			super.onTick(dt);
+		}
+
+		if (shouldSave.get() && ++saveTicks >= SAVE_DELAY) {
+			if (shouldSave.compareAndSet(true, false)) {
+				save();
+				saveTicks = 0;
+			}
+		}
+	}
+
+	@Override
+	public void setTransform(Transform transform) {
+		super.setTransform(transform);
+		shouldSave.set(true);
+	}
+
+	@Override
+	public void setPosition(Point position) {
+		super.setPosition(position);
+		shouldSave.set(true);
+	}
+
+	@Override
+	public void setRotation(Quaternion rotation) {
+		super.setRotation(rotation);
+		shouldSave.set(true);
+	}
+
+	@Override
+	public void setScale(Vector3 scale) {
+		super.setScale(scale);
+		shouldSave.set(true);
+	}
+
+	public void load() {
+		setTransform(engine.getDefaultWorld().getSpawnPoint());
+		// TODO: Player data loading
+	}
+
+	public void save() {
+		// TODO: Player data saving
 	}
 }

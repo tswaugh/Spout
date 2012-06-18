@@ -138,7 +138,7 @@ public class SpoutEngine extends AsyncManager implements Engine {
 	private final RecipeManager recipeManager = new CommonRecipeManager();
 	private final ServiceManager serviceManager = CommonServiceManager.getInstance();
 	private final SnapshotManager snapshotManager = new SnapshotManager();
-	private final SnapshotableLinkedHashMap<String, SpoutPlayer> onlinePlayers = new SnapshotableLinkedHashMap<String, SpoutPlayer>(snapshotManager);
+	private final SnapshotableLinkedHashMap<String, SpoutPlayer> players = new SnapshotableLinkedHashMap<String, SpoutPlayer>(snapshotManager);
 	private final RootCommand rootCommand = new RootCommand(this);
 	private final WorldGenerator defaultGenerator = new EmptyWorldGenerator();
 
@@ -152,10 +152,10 @@ public class SpoutEngine extends AsyncManager implements Engine {
 	protected final SpoutParallelTaskManager parallelTaskManager = new SpoutParallelTaskManager(this);
 	protected final ConcurrentMap<SocketAddress, BootstrapProtocol> bootstrapProtocols = new ConcurrentHashMap<SocketAddress, BootstrapProtocol>();
 	protected final ChannelGroup group = new DefaultChannelGroup();
-	
+
 	private final AtomicBoolean setupComplete = new AtomicBoolean(false);
 	private final MemoryLeakThread leakThread = new MemoryLeakThread();
-	
+
 	protected SpoutConfiguration config = new SpoutConfiguration();
 	private File worldFolder = new File(".");
 	private SnapshotableLinkedHashMap<String, SpoutWorld> loadedWorlds = new SnapshotableLinkedHashMap<String, SpoutWorld>(snapshotManager);
@@ -164,7 +164,7 @@ public class SpoutEngine extends AsyncManager implements Engine {
 	private String logFile;
 	private StringMap engineItemMap = null;
 	private StringMap engineBiomeMap = null;
-	
+
 	protected FileSystem filesystem;
 
 	@Parameter(names = {"-debug", "-d", "--debug", "--d" }, description="Debug Mode")
@@ -265,7 +265,7 @@ public class SpoutEngine extends AsyncManager implements Engine {
 	}
 
 	public Collection<SpoutPlayer> rawGetAllOnlinePlayers() {
-		return onlinePlayers.get().values();
+		return players.get().values();
 	}
 
 	@Override
@@ -286,7 +286,7 @@ public class SpoutEngine extends AsyncManager implements Engine {
 
 	@Override
 	public SpoutPlayer[] getOnlinePlayers() {
-		Map<String, SpoutPlayer> playerList = onlinePlayers.get();
+		Map<String, SpoutPlayer> playerList = players.get();
 		ArrayList<SpoutPlayer> onlinePlayers = new ArrayList<SpoutPlayer>(playerList.size());
 		for (SpoutPlayer player : playerList.values()) {
 			if (player.isOnline()) {
@@ -388,18 +388,27 @@ public class SpoutEngine extends AsyncManager implements Engine {
 
 	@Override
 	public Player getPlayer(String name, boolean exact) {
+		return getPlayer(name, exact, true);
+	}
+
+	@Override
+	public Player getPlayer(String name, boolean exact, boolean offline) {
 		name = name.toLowerCase();
 		if (exact) {
-			for (Player player : onlinePlayers.getValues()) {
-				if (player.getName().equalsIgnoreCase(name)) {
+			for (Player player : players.getValues()) {
+				if ((player.isOnline() || offline) && player.getName().equalsIgnoreCase(name)) {
 					return player;
 				}
+			}
+
+			if (offline) {
+				return addOfflinePlayer(name);
 			}
 		} else {
 			int shortestMatch = Integer.MAX_VALUE;
 			Player shortestPlayer = null;
-			for (Player player : onlinePlayers.getValues()) {
-				if (player.getName().toLowerCase().startsWith(name)) {
+			for (Player player : players.getValues()) {
+				if ((player.isOnline() || offline) && player.getName().toLowerCase().startsWith(name)) {
 					if (player.getName().length() < shortestMatch) {
 						shortestMatch = player.getName().length();
 						shortestPlayer = player;
@@ -621,7 +630,7 @@ public class SpoutEngine extends AsyncManager implements Engine {
 	public void copySnapshotRun() throws InterruptedException {
 		entityManager.copyAllSnapshots();
 		snapshotManager.copyAllSnapshots();
-		for (Player player : onlinePlayers.get().values()) {
+		for (Player player : players.get().values()) {
 			((SpoutPlayer) player).copyToSnapshot();
 		}
 	}
@@ -737,6 +746,15 @@ public class SpoutEngine extends AsyncManager implements Engine {
 		return null;
 	}
 
+	private SpoutPlayer addOfflinePlayer(String name) {
+		SpoutPlayer player = new SpoutPlayer(name, this);
+		if (players.putIfAbsent(name, player) != null) {
+			throw new IllegalStateException("A player with the name " + name + " is already present in the players map!");
+		}
+
+		return player;
+	}
+
 	// Players should use weak map?
 	public Player addPlayer(PlayerController player, String playerName, SpoutSession session) {
 
@@ -744,7 +762,7 @@ public class SpoutEngine extends AsyncManager implements Engine {
 		SpoutPlayer playerEntity = null;
 
 		while (true) {
-			playerEntity = onlinePlayers.getLive().get(playerName);
+			playerEntity = players.getLive().get(playerName);
 
 			if (playerEntity != null) {
 				if (!playerEntity.connect(session)) {
@@ -755,15 +773,11 @@ public class SpoutEngine extends AsyncManager implements Engine {
 			}
 
 			playerEntity = new SpoutPlayer(playerName, session, this, getDefaultWorld().getSpawnPoint(), player);
-			if (onlinePlayers.putIfAbsent(playerName, playerEntity) == null) {
+			if (players.putIfAbsent(playerName, playerEntity) == null) {
 				break;
 			}
 		}
 
-		World world = playerEntity.getWorld();
-		world.spawnEntity(playerEntity);
-		session.setPlayer(playerEntity);
-		((SpoutWorld) world).addPlayer(player);
 		return player.getParent();
 	}
 
@@ -801,11 +815,11 @@ public class SpoutEngine extends AsyncManager implements Engine {
 	public FileSystem getFilesystem() {
 		return filesystem;
 	}
-	
+
 	public MemoryLeakThread getLeakThread() {
 		return leakThread;
 	}
-	
+
 	// The engine doesn't do any of these
 
 	@Override
@@ -821,7 +835,7 @@ public class SpoutEngine extends AsyncManager implements Engine {
 	public long getFirstDynamicUpdateTime() {
 		return SpoutScheduler.END_OF_THE_WORLD;
 	}
-	
+
 	@Override
 	public void runLocalDynamicUpdates(long time) throws InterruptedException {
 	}

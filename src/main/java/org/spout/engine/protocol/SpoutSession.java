@@ -120,7 +120,7 @@ public final class SpoutSession implements Session {
 	 * @todo Probably add to SpoutAPI
 	 */
 	private boolean isConnected = false;
-	
+
 	/**
 	 * Data map and Datatable associated with it
 	 */
@@ -336,10 +336,6 @@ public final class SpoutSession implements Session {
 			//If its null or can't be get, just ignore it
 			//If disconnect fails, we just ignore it for now.
 			try {
-				final Entity entity = player;
-				if (player != null) {
-					((SpoutWorld) entity.getWorld()).removePlayer(player.getController());
-				}
 				player.disconnect();
 			} catch (Exception e) {
 			}
@@ -384,7 +380,7 @@ public final class SpoutSession implements Session {
 	public boolean isConnected() {
 		return channel.isOpen();
 	}
-	
+
 	@Override
 	public DefaultedMap<String, Serializable> getDataMap() {
 		return dataMap;
