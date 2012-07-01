@@ -227,6 +227,7 @@ public class SpoutTaskManager implements TaskManager {
 		return shutdown(1);
 	}
 	
+	@SuppressWarnings("deprecation")
 	public boolean shutdown(long timeout) {
 		if (!mainThread) {
 			throw new IllegalStateException("Only the task manager for the main thread should be shutdown, since the other task managers do not support async tasks");
