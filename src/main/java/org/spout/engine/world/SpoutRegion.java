@@ -26,6 +26,8 @@
  */
 package org.spout.engine.world;
 
+import javax.vecmath.Vector3f;
+
 import gnu.trove.iterator.TIntIterator;
 
 import java.io.File;
@@ -46,6 +48,16 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
+
+import com.bulletphysics.collision.broadphase.BroadphaseInterface;
+import com.bulletphysics.collision.broadphase.DbvtBroadphase;
+import com.bulletphysics.collision.dispatch.CollisionDispatcher;
+import com.bulletphysics.collision.dispatch.CollisionWorld;
+import com.bulletphysics.collision.dispatch.DefaultCollisionConfiguration;
+import com.bulletphysics.dynamics.DiscreteDynamicsWorld;
+import com.bulletphysics.dynamics.DynamicsWorld;
+import com.bulletphysics.dynamics.constraintsolver.ConstraintSolver;
+import com.bulletphysics.dynamics.constraintsolver.SequentialImpulseConstraintSolver;
 
 import org.spout.api.Source;
 import org.spout.api.Spout;
@@ -73,6 +85,7 @@ import org.spout.api.material.block.BlockFullState;
 import org.spout.api.material.range.EffectIterator;
 import org.spout.api.material.range.EffectRange;
 import org.spout.api.math.IntVector3;
+import org.spout.api.math.MathHelper;
 import org.spout.api.math.Vector3;
 import org.spout.api.player.Player;
 import org.spout.api.protocol.NetworkSynchronizer;
@@ -99,7 +112,7 @@ import org.spout.engine.world.dynamic.DynamicBlockUpdateTree;
 import org.spout.engine.world.physics.PhysicsQueue;
 import org.spout.engine.world.physics.UpdateQueue;
 
-public class SpoutRegion extends Region{
+public class SpoutRegion extends Region {
 	private AtomicInteger numberActiveChunks = new AtomicInteger();
 	// Can't extend AsyncManager and Region
 	private final SpoutRegionManager manager;
@@ -180,6 +193,13 @@ public class SpoutRegion extends Region{
 
 	private final DynamicBlockUpdateTree dynamicBlockTree;
 	private List<DynamicBlockUpdate> multiRegionUpdates = null;
+	//Bullet physics
+	private DynamicsWorld dynamicsWorld;
+	private BroadphaseInterface broadphase;
+	private CollisionDispatcher dispatcher;
+	private ConstraintSolver solver;
+	private DefaultCollisionConfiguration collisionConfiguration;
+	private Vector3 gravity;
 
 	public SpoutRegion(SpoutWorld world, float x, float y, float z, RegionSource source) {
 		this(world, x, y, z, source, LoadOption.NO_LOAD);
@@ -231,6 +251,7 @@ public class SpoutRegion extends Region{
 			throw new IllegalStateException("AsyncExecutor should be instance of Thread");
 		}
 		taskManager = new SpoutTaskManager(world.getEngine().getScheduler(), false, t, world.getAge());
+		initPhysics();
 	}
 
 	@Override
@@ -1253,6 +1274,17 @@ public class SpoutRegion extends Region{
 		return taskManager;
 	}
 
+	@Override
+	public Vector3 getGravity() {
+		return gravity;
+	}
+
+	@Override
+	public void setGravity(Vector3 gravity) {
+		this.gravity = gravity;
+		dynamicsWorld.setGravity(MathHelper.toVector3f(gravity));
+	}
+
 	public void skipChunk(SpoutChunk chunk) {
 		occupiedChunks.remove(chunk);
 	}
@@ -1286,7 +1318,6 @@ public class SpoutRegion extends Region{
 		return dynamicBlockTree.queueBlockUpdates(x, y, z);
 	}
 
-
 	// TODO - save needs to call this method
 	public List<DynamicBlockUpdate> getDynamicBlockUpdates(Chunk c) {
 		Set<DynamicBlockUpdate> updates = dynamicBlockTree.getDynamicBlockUpdates(c);
@@ -1306,4 +1337,13 @@ public class SpoutRegion extends Region{
 	public void addSnapshotFuture(SpoutChunkSnapshotFuture future) {
 		snapshotQueue.add(future);
 	}
+
+	public void initPhysics() {
+		collisionConfiguration = new DefaultCollisionConfiguration();
+		dispatcher = new CollisionDispatcher(collisionConfiguration);
+		broadphase = new DbvtBroadphase();
+		solver = new SequentialImpulseConstraintSolver();
+		dynamicsWorld = new DiscreteDynamicsWorld(dispatcher, broadphase, solver, collisionConfiguration);
+	}
 }
+
