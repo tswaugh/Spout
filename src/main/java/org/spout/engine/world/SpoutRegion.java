@@ -1275,14 +1275,8 @@ public class SpoutRegion extends Region {
 	}
 
 	@Override
-	public Vector3 getGravity() {
-		return gravity;
-	}
-
-	@Override
-	public void setGravity(Vector3 gravity) {
-		this.gravity = gravity;
-		dynamicsWorld.setGravity(MathHelper.toVector3f(gravity));
+	public DynamicsWorld getSimulation() {
+		return dynamicsWorld;
 	}
 
 	public void skipChunk(SpoutChunk chunk) {
@@ -1344,6 +1338,17 @@ public class SpoutRegion extends Region {
 		broadphase = new DbvtBroadphase();
 		solver = new SequentialImpulseConstraintSolver();
 		dynamicsWorld = new DiscreteDynamicsWorld(dispatcher, broadphase, solver, collisionConfiguration);
+	}
+
+	@Override
+	public Vector3 getGravity() {
+		return gravity;
+	}
+
+	@Override
+	public void setGravity(Vector3 gravity) {
+		this.gravity = gravity;
+		dynamicsWorld.setGravity(MathHelper.toVector3f(gravity));
 	}
 }
 
