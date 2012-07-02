@@ -36,7 +36,6 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import org.spout.api.Source;
 import org.spout.api.Spout;
-import org.spout.api.collision.CollisionModel;
 import org.spout.api.entity.Entity;
 import org.spout.api.entity.EntityComponent;
 import org.spout.api.entity.component.Controller;
@@ -80,7 +79,6 @@ public class SpoutEntity extends Tickable implements Entity {
 	private boolean attached = false;
 	private int viewDistance;
 	private Chunk chunk;
-	private CollisionModel collision;
 	private Controller controller;
 	private EntityManager entityManager;
 	private Model model;
@@ -461,21 +459,6 @@ public class SpoutEntity extends Tickable implements Entity {
 	@Override
 	public Model getModel() {
 		return model;
-	}
-
-	// TODO - needs to be made thread safe
-	@Override
-	public void setCollision(CollisionModel model) {
-		collision = model;
-		if (collision != null) {
-			collision.setPosition(this.transform.getPosition());
-		}
-	}
-
-	// TODO - needs to be made thread safe
-	@Override
-	public CollisionModel getCollision() {
-		return collision;
 	}
 
 	@Override
