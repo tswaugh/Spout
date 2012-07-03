@@ -212,7 +212,7 @@ public class EntityManager implements Iterable<SpoutEntity> {
 			}
 
 			PlayerController p = (PlayerController) controller;
-			NetworkSynchronizer n = ((SpoutPlayer) p).getNetworkSynchronizer();
+			NetworkSynchronizer n = (p.getParent()).getNetworkSynchronizer();
 			if (n != null) {
 				n.finalizeTick();
 			}

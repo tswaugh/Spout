@@ -114,6 +114,7 @@ public class SpoutEntity implements Entity, Tickable {
 				setObserver(true);
 			}
 		}
+
 	}
 
 	public SpoutEntity(SpoutEngine engine, Transform transform, Controller controller, int viewDistance) {
@@ -139,13 +140,6 @@ public class SpoutEntity implements Entity, Tickable {
 	@Override
 	public void onTick(float dt) {
 		Controller cont = controllerLive.get();
-		//Pulse all player messages here, so they can interact with the entities position safely
-		if (cont instanceof PlayerController) {
-			Player player = (Player) controller.getParent();
-			if (player != null && player.getSession() != null) {
-				((SpoutSession) player.getSession()).pulse();
-			}
-		}
 
 		//Tick the controller
 		if (cont != null) {

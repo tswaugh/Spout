@@ -59,7 +59,7 @@ public class SpoutListener implements Listener {
 			return;
 		}
 		//Create the player
-		final Player player = server.addPlayer(event.getController(), event.getPlayerName(), (SpoutSession) event.getSession());
+		final Player player = server.addPlayer(event.getPlayerName(), (SpoutSession) event.getSession());
 
 		if (player != null) {
 			PlayerLoadEvent loadEvent = Spout.getEngine().getEventManager().callEvent(new PlayerLoadEvent(player));

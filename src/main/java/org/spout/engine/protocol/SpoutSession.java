@@ -169,6 +169,11 @@ public final class SpoutSession implements Session {
 		return player;
 	}
 
+	@Override
+	public boolean hasPlayer() {
+		return player == null ? false : true;
+	}
+
 	/**
 	 * Sets the player associated with this session.
 	 * @param player The new player.
@@ -197,7 +202,7 @@ public final class SpoutSession implements Session {
 			MessageHandler<Message> handler = (MessageHandler<Message>) protocol.get().getHandlerLookupService().find(message.getClass());
 			if (handler != null) {
 				try {
-					handler.handle(this, player, message);
+					handler.handle(this, message);
 				} catch (Exception e) {
 					Spout.getEngine().getLogger().log(Level.SEVERE, "Message handler for " + message.getClass().getSimpleName() + " threw exception for player " + (getPlayer() != null ? getPlayer().getName() : "null"));
 					e.printStackTrace();

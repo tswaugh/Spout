@@ -93,16 +93,8 @@ public class SpoutPlayer extends SpoutEntity implements Player {
 	private final AtomicBoolean shouldSave = new AtomicBoolean();
 	private int saveTicks;
 
-	public SpoutPlayer(String name, SpoutEngine engine) {
-		super(engine, (Transform) null, null);
-		this.name = name;
-		displayName.set(name);
-		hashcode = name.hashCode();
-		load();
-	}
-
-	public SpoutPlayer(String name, SpoutSession session, SpoutEngine engine, Transform transform, Controller controller) {
-		super(engine, transform, controller, SpoutConfiguration.VIEW_DISTANCE.getInt() * Chunk.BLOCKS.SIZE);
+	public SpoutPlayer(String name, Transform transform, SpoutSession session, SpoutEngine engine) {
+		super(engine, transform, null);
 		this.name = name;
 		displayName.set(name);
 		hashcode = name.hashCode();
@@ -169,7 +161,7 @@ public class SpoutPlayer extends SpoutEntity implements Player {
 			// player was already offline
 			return false;
 		}
-		this.save();
+//		this.save();
 		this.shouldSave.set(false);
 		((SpoutWorld) getWorld()).removePlayer(this);
 		this.kill();
@@ -191,7 +183,7 @@ public class SpoutPlayer extends SpoutEntity implements Player {
 			return false;
 		}
 
-		this.load();
+//		this.load();
 		setupInitialChunk(transform);
 		sessionLive.set(session);
 		session.setPlayer(this);
@@ -342,12 +334,13 @@ public class SpoutPlayer extends SpoutEntity implements Player {
 	@Override
 	public void onTick(float dt) {
 		if (isOnline()) {
+			this.getSession().pulse();
 			super.onTick(dt);
 		}
 
 		if (shouldSave.get() && ++saveTicks >= SAVE_DELAY) {
 			if (shouldSave.compareAndSet(true, false)) {
-				save();
+//				save();
 				saveTicks = 0;
 			}
 		}
@@ -375,14 +368,5 @@ public class SpoutPlayer extends SpoutEntity implements Player {
 	public void setScale(Vector3 scale) {
 		super.setScale(scale);
 		shouldSave.set(true);
-	}
-
-	public void load() {
-		setTransform(engine.getDefaultWorld().getSpawnPoint());
-		// TODO: Player data loading
-	}
-
-	public void save() {
-		// TODO: Player data saving
 	}
 }

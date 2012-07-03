@@ -747,38 +747,40 @@ public class SpoutEngine extends AsyncManager implements Engine {
 	}
 
 	private SpoutPlayer addOfflinePlayer(String name) {
-		SpoutPlayer player = new SpoutPlayer(name, this);
-		if (players.putIfAbsent(name, player) != null) {
-			throw new IllegalStateException("A player with the name " + name + " is already present in the players map!");
-		}
-
-		return player;
+//		TODO: Fix this/change this/remove this
+//		SpoutPlayer player = new SpoutPlayer(name, this);
+//		if (players.putIfAbsent(name, player) != null) {
+//			throw new IllegalStateException("A player with the name " + name + " is already present in the players map!");
+//		}
+//
+//		return player;
+		return null;
 	}
 
 	// Players should use weak map?
-	public Player addPlayer(PlayerController player, String playerName, SpoutSession session) {
+	public Player addPlayer(String playerName, SpoutSession session) {
 
 		// The new player needs a corresponding entity
-		SpoutPlayer playerEntity = null;
+		SpoutPlayer player = null;
 
 		while (true) {
-			playerEntity = players.getLive().get(playerName);
+			player = players.getLive().get(playerName);
 
-			if (playerEntity != null) {
-				if (!playerEntity.connect(session)) {
+			if (player != null) {
+				if (!player.connect(session)) {
 					return null;
 				}
 
 				break;
 			}
 
-			playerEntity = new SpoutPlayer(playerName, session, this, getDefaultWorld().getSpawnPoint(), player);
-			if (players.putIfAbsent(playerName, playerEntity) == null) {
+			player = new SpoutPlayer(playerName, this.getDefaultWorld().getSpawnPoint(), session, this);
+			if (players.putIfAbsent(playerName, player) == null) {
 				break;
 			}
 		}
 
-		return player.getParent();
+		return player;
 	}
 
 	protected Collection<SpoutWorld> getLiveWorlds() {
