@@ -52,12 +52,16 @@ import java.util.logging.Level;
 import com.bulletphysics.collision.broadphase.BroadphaseInterface;
 import com.bulletphysics.collision.broadphase.DbvtBroadphase;
 import com.bulletphysics.collision.dispatch.CollisionDispatcher;
+import com.bulletphysics.collision.dispatch.CollisionObject;
 import com.bulletphysics.collision.dispatch.CollisionWorld;
 import com.bulletphysics.collision.dispatch.DefaultCollisionConfiguration;
+import com.bulletphysics.collision.shapes.ConvexHullShape;
 import com.bulletphysics.dynamics.DiscreteDynamicsWorld;
 import com.bulletphysics.dynamics.DynamicsWorld;
+import com.bulletphysics.dynamics.RigidBody;
 import com.bulletphysics.dynamics.constraintsolver.ConstraintSolver;
 import com.bulletphysics.dynamics.constraintsolver.SequentialImpulseConstraintSolver;
+import com.bulletphysics.util.ObjectArrayList;
 
 import org.spout.api.Source;
 import org.spout.api.Spout;
@@ -77,6 +81,9 @@ import org.spout.api.geo.World;
 import org.spout.api.geo.cuboid.Block;
 import org.spout.api.geo.cuboid.Chunk;
 import org.spout.api.geo.cuboid.ChunkSnapshot;
+import org.spout.api.geo.cuboid.ChunkSnapshot.EntityType;
+import org.spout.api.geo.cuboid.ChunkSnapshot.ExtraData;
+import org.spout.api.geo.cuboid.ChunkSnapshot.SnapshotType;
 import org.spout.api.geo.cuboid.Region;
 import org.spout.api.geo.discrete.Point;
 import org.spout.api.io.bytearrayarray.BAAWrapper;
@@ -194,11 +201,11 @@ public class SpoutRegion extends Region {
 	private final DynamicBlockUpdateTree dynamicBlockTree;
 	private List<DynamicBlockUpdate> multiRegionUpdates = null;
 	//Bullet physics
-	private DynamicsWorld dynamicsWorld;
-	private BroadphaseInterface broadphase;
-	private CollisionDispatcher dispatcher;
-	private ConstraintSolver solver;
-	private DefaultCollisionConfiguration collisionConfiguration;
+	private final DynamicsWorld dynamicsWorld;
+	private final BroadphaseInterface broadphase;
+	private final CollisionDispatcher dispatcher;
+	private final ConstraintSolver solver;
+	private final DefaultCollisionConfiguration collisionConfiguration;
 	private Vector3 gravity;
 
 	public SpoutRegion(SpoutWorld world, float x, float y, float z, RegionSource source) {
@@ -251,7 +258,14 @@ public class SpoutRegion extends Region {
 			throw new IllegalStateException("AsyncExecutor should be instance of Thread");
 		}
 		taskManager = new SpoutTaskManager(world.getEngine().getScheduler(), false, t, world.getAge());
-		initPhysics();
+		
+		//Init physics
+		collisionConfiguration = new DefaultCollisionConfiguration();
+		dispatcher = new CollisionDispatcher(collisionConfiguration);
+		broadphase = new DbvtBroadphase();
+		solver = new SequentialImpulseConstraintSolver();
+		dynamicsWorld = new DiscreteDynamicsWorld(dispatcher, broadphase, solver, collisionConfiguration);
+		setGravity(new Vector3(0, 9.8F, 0));
 	}
 
 	@Override
@@ -324,6 +338,20 @@ public class SpoutRegion extends Region {
 				if (!newChunk.isPopulated()) {
 					queueChunkForPopulation(newChunk);
 				}
+				
+				ObjectArrayList<Vector3f> mesh = new ObjectArrayList<Vector3f>(Chunk.BLOCKS.SIZE * Chunk.BLOCKS.SIZE *Chunk.BLOCKS.SIZE / 2);
+				ChunkSnapshot snapshot = newChunk.getSnapshot(SnapshotType.BLOCK_IDS_ONLY, EntityType.NO_ENTITIES, ExtraData.NO_EXTRA_DATA);
+				for (int dx = 0; dx < Chunk.BLOCKS.SIZE; dx++) {
+					for (int dy = 0; dy <  Chunk.BLOCKS.SIZE; dy++) {
+						for (int dz = 0; dz <  Chunk.BLOCKS.SIZE; dz++) {
+							if (snapshot.getBlockMaterial(dx, dy, dz).isSolid()) {
+								mesh.add(new Vector3f(x * Chunk.BLOCKS.SIZE + dx, y * Chunk.BLOCKS.SIZE + dy, z * Chunk.BLOCKS.SIZE + dz));
+							}
+						}
+					}
+				}
+				ConvexHullShape shape = new ConvexHullShape(mesh); 
+				this.dynamicsWorld.addCollisionObject(new RigidBody(0, null, shape));
 
 				return newChunk;
 			}
@@ -598,6 +626,13 @@ public class SpoutRegion extends Region {
 				old.kill();
 			}
 		}
+		//TODO: Does this matter? RigidBody is a type of CollisionObject
+		CollisionObject object = ((SpoutEntity)e).getBody();
+		if (object instanceof RigidBody) {
+			this.dynamicsWorld.addRigidBody((RigidBody)object);
+		} else if (object != null) {
+			this.dynamicsWorld.addCollisionObject(object);
+		}
 		this.allocate((SpoutEntity) e);
 	}
 
@@ -607,10 +642,18 @@ public class SpoutRegion extends Region {
 		if (be == e) {
 			blockEntities.remove(pos);
 		}
+		//TODO: Does this matter? RigidBody is a type of CollisionObject
+		CollisionObject object = ((SpoutEntity)e).getBody();
+		if (object instanceof RigidBody) {
+			this.dynamicsWorld.removeRigidBody((RigidBody)object);
+		} else if (object != null) {
+			this.dynamicsWorld.removeCollisionObject(object);
+		}
 		this.deallocate((SpoutEntity)e);
 	}
 
 	public void startTickRun(int stage, long delta) {
+		final float dt = delta / 1000.f;
 		boolean visibleToPlayers = this.entityManager.getPlayers().size() > 0;
 		if (!visibleToPlayers) {
 			//Search for players near to the center of the region
@@ -626,7 +669,6 @@ public class SpoutRegion extends Region {
 				Profiler.start("startTickRun stage 1");
 				try {
 					taskManager.heartbeat(delta);
-					float dt = delta / 1000.f;
 					Profiler.start("tick entities");
 					//Update all entities
 					for (SpoutEntity ent : entityManager) {
@@ -721,6 +763,7 @@ public class SpoutRegion extends Region {
 						}
 					}
 	
+					this.dynamicsWorld.stepSimulation(dt);
 					for (SpoutEntity ent : resolvers) {
 						try {
 							ent.resolve();
@@ -1368,14 +1411,6 @@ public class SpoutRegion extends Region {
 
 	public void addSnapshotFuture(SpoutChunkSnapshotFuture future) {
 		snapshotQueue.add(future);
-	}
-
-	public void initPhysics() {
-		collisionConfiguration = new DefaultCollisionConfiguration();
-		dispatcher = new CollisionDispatcher(collisionConfiguration);
-		broadphase = new DbvtBroadphase();
-		solver = new SequentialImpulseConstraintSolver();
-		dynamicsWorld = new DiscreteDynamicsWorld(dispatcher, broadphase, solver, collisionConfiguration);
 	}
 
 	@Override

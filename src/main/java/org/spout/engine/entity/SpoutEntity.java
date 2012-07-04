@@ -34,6 +34,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
+import javax.vecmath.Quat4f;
+import javax.vecmath.Vector3f;
+
 import org.spout.api.Source;
 import org.spout.api.Spout;
 import org.spout.api.entity.Entity;
@@ -62,6 +65,13 @@ import org.spout.engine.protocol.SpoutSession;
 import org.spout.engine.world.SpoutChunk;
 import org.spout.engine.world.SpoutRegion;
 
+import com.bulletphysics.collision.dispatch.CollisionObject;
+import com.bulletphysics.collision.dispatch.GhostObject;
+import com.bulletphysics.collision.shapes.BoxShape;
+import com.bulletphysics.collision.shapes.CollisionShape;
+import com.bulletphysics.dynamics.RigidBody;
+import com.bulletphysics.linearmath.MotionState;
+
 public class SpoutEntity extends Tickable implements Entity {
 	public static final int NOTSPAWNEDID = -1;
 	//Thread-safe
@@ -85,6 +95,8 @@ public class SpoutEntity extends Tickable implements Entity {
 	private Model model;
 	private Thread owningThread;
 	private Transform lastTransform = transform;
+	
+	private final CollisionObject body;
 
 	public SpoutEntity(SpoutEngine engine, Transform transform, Controller controller, int viewDistance, UUID uid, boolean load) {
 		id.set(NOTSPAWNEDID);
@@ -117,9 +129,14 @@ public class SpoutEntity extends Tickable implements Entity {
 		controllerLive.set(controller);
 		if (controller != null) {
 			controller.attachToEntity(this);
-			if (controller instanceof PlayerController) {
+			if (controller instanceof PlayerController || controller instanceof org.spout.api.entity.component.controller.basic.PointObserver) {
 				setObserver(true);
+				body = null;
+			} else {
+				body = new RigidBody(1F, new EntityMotionState(this), new BoxShape(new Vector3f(1.5F, 1.5F, 1.5F)));
 			}
+		} else {
+			body = new RigidBody(1F, new EntityMotionState(this), new BoxShape(new Vector3f(1.5F, 1.5F, 1.5F)));
 		}
 	}
 
@@ -393,6 +410,7 @@ public class SpoutEntity extends Tickable implements Entity {
 	}
 
 	private boolean activeThreadIsValid(String attemptedAction) {
+		return true; /*
 		Thread current = Thread.currentThread();
 		boolean invalidAccess = !(this.owningThread == current || Spout.getEngine().getMainThread() == current);
 
@@ -403,7 +421,7 @@ public class SpoutEntity extends Tickable implements Entity {
 
 			throw new IllegalAccessError("Tried to " + attemptedAction + " from another thread {current: " + Thread.currentThread() + " owner: " + owningThread.getName() + "}!");
 		}
-		return !invalidAccess;
+		return !invalidAccess;*/
 	}
 
 	@Override
@@ -724,5 +742,43 @@ public class SpoutEntity extends Tickable implements Entity {
 	@Override
 	public UUID getUID() {
 		return uid;
+	}
+
+	@Override
+	public CollisionShape getCollision() {
+		return body.getCollisionShape();
+	}
+
+	@Override
+	public void setCollisionShape(CollisionShape shape) {
+		body.setCollisionShape(shape);
+	}
+
+	public CollisionObject getBody() {
+		return body;
+	}
+	
+	private class EntityMotionState extends MotionState {
+		final SpoutEntity parent;
+		EntityMotionState(SpoutEntity parent) {
+			this.parent = parent;
+		}
+
+		@Override
+		public com.bulletphysics.linearmath.Transform getWorldTransform(com.bulletphysics.linearmath.Transform out) {
+			out.setRotation(MathHelper.toQuaternionf(parent.getRotation()));
+			Vector3 pos = parent.getPosition();
+			out.origin.x = pos.getX();
+			out.origin.y = pos.getY();
+			out.origin.z = pos.getZ();
+			return out;
+		}
+
+		@Override
+		public void setWorldTransform(com.bulletphysics.linearmath.Transform worldTrans) {
+			parent.setPosition(new Point(MathHelper.toVector3f(worldTrans.origin), parent.getWorld()));
+			Quat4f identity = new Quat4f();
+			parent.setRotation(MathHelper.toQuaternion(worldTrans.getRotation(identity)));
+		}
 	}
 }
